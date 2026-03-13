@@ -39,7 +39,7 @@ def save_response(row):
     with open(file, "a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(row)
-        f.flush()  # ensure data is written immediately
+        f.flush()
 
 # -----------------------------
 # Streamlit UI
@@ -74,14 +74,14 @@ if "basket2_pref" not in st.session_state:
 # Basket 1 Selection
 # -----------------------------
 st.subheader("Basket 1 Preferences")
-
 for i in range(7):
-    available1 = [c for c in basket1 if c not in st.session_state.basket1_pref]
+    # Include current value in available list to retain selection
+    available1 = [c for c in basket1 if c not in st.session_state.basket1_pref or c == st.session_state.basket1_pref[i]]
     pref = st.selectbox(
         f"Basket1 Preference {i+1}",
         [""] + available1,
-        index=0 if st.session_state.basket1_pref[i] == "" else None,
-        key=f"b1_{i}"
+        key=f"b1_{i}",
+        format_func=lambda x: x
     )
     st.session_state.basket1_pref[i] = pref
 
@@ -89,14 +89,13 @@ for i in range(7):
 # Basket 2 Selection
 # -----------------------------
 st.subheader("Basket 2 Preferences")
-
 for i in range(7):
-    available2 = [c for c in basket2 if c not in st.session_state.basket2_pref]
+    available2 = [c for c in basket2 if c not in st.session_state.basket2_pref or c == st.session_state.basket2_pref[i]]
     pref = st.selectbox(
         f"Basket2 Preference {i+1}",
         [""] + available2,
-        index=0 if st.session_state.basket2_pref[i] == "" else None,
-        key=f"b2_{i}"
+        key=f"b2_{i}",
+        format_func=lambda x: x
     )
     st.session_state.basket2_pref[i] = pref
 
@@ -104,7 +103,6 @@ for i in range(7):
 # Submit Button
 # -----------------------------
 if st.button("Submit Preferences"):
-
     b1 = [x for x in st.session_state.basket1_pref if x != ""]
     b2 = [x for x in st.session_state.basket2_pref if x != ""]
 
