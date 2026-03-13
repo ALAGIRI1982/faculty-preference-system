@@ -4,20 +4,25 @@ import csv
 import os
 
 # -----------------------------
-# Load Data
+# Load Course Data
 # -----------------------------
 
 courses = pd.read_excel("courses.xlsx", sheet_name=None)
+
 basket1 = courses["Sheet1"]["Course"].dropna().tolist()
 basket2 = courses["Sheet2"]["Course"].dropna().tolist()
 
+# -----------------------------
+# Load Employee Data
+# -----------------------------
+
 employees = pd.read_excel("employees.xlsx")
 
-file = "responses.csv"
+# -----------------------------
+# Response File
+# -----------------------------
 
-# -----------------------------
-# Header
-# -----------------------------
+file = "responses.csv"
 
 header = [
 "EmpID","Name","Designation",
@@ -26,14 +31,14 @@ header = [
 ]
 
 # -----------------------------
-# Save Function
+# Save Response Function
 # -----------------------------
 
 def save_response(row):
 
     file_exists = os.path.isfile(file)
 
-    with open(file, "a", newline="") as f:
+    with open(file,"a",newline="") as f:
 
         writer = csv.writer(f)
 
@@ -50,20 +55,20 @@ st.title("Faculty Course Preference System")
 
 empid = st.text_input("Enter Employee ID")
 
-name = ""
-designation = ""
+name=""
+designation=""
 
 if empid:
 
-    emp = employees[employees["EmpID"].astype(str) == empid]
+    emp = employees[employees["EmpID"].astype(str)==empid]
 
     if not emp.empty:
 
         name = emp.iloc[0]["Name"]
         designation = emp.iloc[0]["Designation"]
 
-        st.write("Name :", name)
-        st.write("Designation :", designation)
+        st.write("Name :",name)
+        st.write("Designation :",designation)
 
     else:
 
@@ -75,17 +80,21 @@ if empid:
 
 st.subheader("Basket 1 Preferences")
 
-basket1_pref = []
+basket1_pref=[]
+available1=basket1.copy()
 
 for i in range(7):
 
     pref = st.selectbox(
         f"Basket1 Preference {i+1}",
-        [""] + basket1,
+        [""]+available1,
         key=f"b1_{i}"
     )
 
     basket1_pref.append(pref)
+
+    if pref in available1:
+        available1.remove(pref)
 
 # -----------------------------
 # Basket 2 Preferences
@@ -93,17 +102,21 @@ for i in range(7):
 
 st.subheader("Basket 2 Preferences")
 
-basket2_pref = []
+basket2_pref=[]
+available2=basket2.copy()
 
 for i in range(7):
 
     pref = st.selectbox(
         f"Basket2 Preference {i+1}",
-        [""] + basket2,
+        [""]+available2,
         key=f"b2_{i}"
     )
 
     basket2_pref.append(pref)
+
+    if pref in available2:
+        available2.remove(pref)
 
 # -----------------------------
 # Submit Button
@@ -111,19 +124,18 @@ for i in range(7):
 
 if st.button("Submit Preferences"):
 
-    # Remove empty selections
-    b1 = [x for x in basket1_pref if x != ""]
-    b2 = [x for x in basket2_pref if x != ""]
+    b1=[x for x in basket1_pref if x!=""]
+    b2=[x for x in basket2_pref if x!=""]
 
-    if len(set(b1)) != len(b1):
+    if len(set(b1))!=len(b1):
         st.error("Duplicate course in Basket 1")
 
-    elif len(set(b2)) != len(b2):
+    elif len(set(b2))!=len(b2):
         st.error("Duplicate course in Basket 2")
 
     else:
 
-        row = [
+        row=[
         empid,
         name,
         designation,
