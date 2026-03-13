@@ -1,124 +1,136 @@
 import streamlit as st
 import pandas as pd
+import csv
 import os
 
-st.title("Faculty Course Preference Collection")
+# -----------------------------
+# Load Data
+# -----------------------------
 
-# Load course baskets
-basket1 = pd.read_excel("courses.xlsx", sheet_name="Sheet1")
-basket2 = pd.read_excel("courses.xlsx", sheet_name="Sheet2")
+courses = pd.read_excel("courses.xlsx", sheet_name=None)
+basket1 = courses["Sheet1"]["Course"].dropna().tolist()
+basket2 = courses["Sheet2"]["Course"].dropna().tolist()
 
-b1 = basket1.iloc[:,0].tolist()
-b2 = basket2.iloc[:,0].tolist()
-
-# Load employee file
 employees = pd.read_excel("employees.xlsx")
-employees.columns = employees.columns.str.strip()
+
+file = "responses.csv"
+
+# -----------------------------
+# Header
+# -----------------------------
+
+header = [
+"EmpID","Name","Designation",
+"B1_P1","B1_P2","B1_P3","B1_P4","B1_P5","B1_P6","B1_P7",
+"B2_P1","B2_P2","B2_P3","B2_P4","B2_P5","B2_P6","B2_P7"
+]
+
+# -----------------------------
+# Save Function
+# -----------------------------
+
+def save_response(row):
+
+    file_exists = os.path.isfile(file)
+
+    with open(file, "a", newline="") as f:
+
+        writer = csv.writer(f)
+
+        if not file_exists or os.stat(file).st_size == 0:
+            writer.writerow(header)
+
+        writer.writerow(row)
+
+# -----------------------------
+# UI
+# -----------------------------
+
+st.title("Faculty Course Preference System")
 
 empid = st.text_input("Enter Employee ID")
 
-name=""
-designation=""
+name = ""
+designation = ""
 
-if empid!="":
+if empid:
 
-    emp = employees[employees["EmpID"].astype(str)==empid]
+    emp = employees[employees["EmpID"].astype(str) == empid]
 
     if not emp.empty:
 
         name = emp.iloc[0]["Name"]
         designation = emp.iloc[0]["Designation"]
 
-        st.success("Employee Found")
-        st.write("Name:",name)
-        st.write("Designation:",designation)
+        st.write("Name :", name)
+        st.write("Designation :", designation)
 
     else:
-        st.error("Invalid Employee ID")
 
-# ---------------- Basket 1 ----------------
+        st.error("Employee ID not found")
 
-st.header("Basket 1 Preferences")
+# -----------------------------
+# Basket 1 Preferences
+# -----------------------------
 
-basket1_pref=[]
-available1=b1.copy()
+st.subheader("Basket 1 Preferences")
 
-for i in range(7):
-
-    choice=st.selectbox(
-        f"Preference {i+1}",
-        available1,
-        key=f"b1{i}"
-    )
-
-    basket1_pref.append(choice)
-
-    if choice in available1:
-        available1.remove(choice)
-
-# ---------------- Basket 2 ----------------
-
-st.header("Basket 2 Preferences")
-
-basket2_pref=[]
-available2=b2.copy()
+basket1_pref = []
 
 for i in range(7):
 
-    choice=st.selectbox(
-        f"Preference {i+1}",
-        available2,
-        key=f"b2{i}"
+    pref = st.selectbox(
+        f"Basket1 Preference {i+1}",
+        [""] + basket1,
+        key=f"b1_{i}"
     )
 
-    basket2_pref.append(choice)
+    basket1_pref.append(pref)
 
-    if choice in available2:
-        available2.remove(choice)
+# -----------------------------
+# Basket 2 Preferences
+# -----------------------------
 
-# ---------------- Submit ----------------
+st.subheader("Basket 2 Preferences")
+
+basket2_pref = []
+
+for i in range(7):
+
+    pref = st.selectbox(
+        f"Basket2 Preference {i+1}",
+        [""] + basket2,
+        key=f"b2_{i}"
+    )
+
+    basket2_pref.append(pref)
+
+# -----------------------------
+# Submit Button
+# -----------------------------
 
 if st.button("Submit Preferences"):
 
-    if empid=="" or name=="":
-        st.error("Enter valid Employee ID")
+    # Remove empty selections
+    b1 = [x for x in basket1_pref if x != ""]
+    b2 = [x for x in basket2_pref if x != ""]
+
+    if len(set(b1)) != len(b1):
+        st.error("Duplicate course in Basket 1")
+
+    elif len(set(b2)) != len(b2):
+        st.error("Duplicate course in Basket 2")
 
     else:
 
-        data={
-        "EmpID":empid,
-        "Name":name,
-        "Designation":designation,
-        "B1_P1":basket1_pref[0],
-        "B1_P2":basket1_pref[1],
-        "B1_P3":basket1_pref[2],
-        "B1_P4":basket1_pref[3],
-        "B1_P5":basket1_pref[4],
-        "B1_P6":basket1_pref[5],
-        "B1_P7":basket1_pref[6],
-        "B2_P1":basket2_pref[0],
-        "B2_P2":basket2_pref[1],
-        "B2_P3":basket2_pref[2],
-        "B2_P4":basket2_pref[3],
-        "B2_P5":basket2_pref[4],
-        "B2_P6":basket2_pref[5],
-        "B2_P7":basket2_pref[6]
-        }
+        row = [
+        empid,
+        name,
+        designation,
+        *basket1_pref,
+        *basket2_pref
+        ]
 
-        df=pd.DataFrame([data])
-
-        file="responses.csv"
-
-        if os.path.exists(file):
-
-            old=pd.read_csv(file)
-
-            if empid in old["EmpID"].astype(str).values:
-                st.error("You already submitted preferences")
-                st.stop()
-
-            df=pd.concat([old,df],ignore_index=True)
-
-        df.to_csv(file,index=False)
+        save_response(row)
 
         st.success("Preferences submitted successfully")
