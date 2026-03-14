@@ -1,21 +1,34 @@
 import streamlit as st
 import pandas as pd
-import json
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+
+st.title("Faculty Course Preference System")
+
+# -----------------------------
+# Load Courses from Excel
+# -----------------------------
+
+courses = pd.read_excel("courses.xlsx")
+
+basket1 = courses["Basket1"].dropna().tolist()
+basket2 = courses["Basket2"].dropna().tolist()
+
 
 # -----------------------------
 # Google Sheet Connection
 # -----------------------------
 
 scope = [
-"https://spreadsheets.google.com/feeds",
+"https://www.googleapis.com/auth/spreadsheets",
 "https://www.googleapis.com/auth/drive"
 ]
 
-creds_dict = json.loads(st.secrets["gcp_service_account"]["json"])
-
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+creds = Credentials.from_service_account_info(
+st.secrets["gcp_service_account"],
+scopes=scope
+)
 
 client = gspread.authorize(creds)
 
@@ -23,142 +36,62 @@ sheet = client.open_by_key("YOUR_SHEET_ID").sheet1
 
 
 # -----------------------------
-# Check Duplicate Submission
+# Create Header Automatically
 # -----------------------------
 
-def empid_exists(empid):
+header = ["Timestamp","Faculty_Name","Faculty_ID","Basket1","Basket2"]
 
-    records = sheet.col_values(1)
-
-    if empid in records:
-        return True
-    return False
+if sheet.row_values(1) != header:
+    sheet.insert_row(header,1)
 
 
 # -----------------------------
-# Load Employee Data
+# Faculty Information
 # -----------------------------
 
-employees = pd.read_excel("employees.xlsx")
-
-
-# -----------------------------
-# Load Course Data
-# -----------------------------
-
-courses = pd.read_excel("courses.xlsx", sheet_name=None)
-
-basket1 = courses["Sheet1"]["Course"].dropna().tolist()
-basket2 = courses["Sheet2"]["Course"].dropna().tolist()
+faculty_name = st.text_input("Faculty Name")
+faculty_id = st.text_input("Faculty ID / Email")
 
 
 # -----------------------------
-# Session State
+# Basket Selection
 # -----------------------------
 
-if "basket1_pref" not in st.session_state:
-    st.session_state.basket1_pref = [""] * 7
+st.subheader("Basket 1 Course Selection")
+pref1 = st.multiselect("Select Courses", basket1)
 
-if "basket2_pref" not in st.session_state:
-    st.session_state.basket2_pref = [""] * 7
-
-
-# -----------------------------
-# UI
-# -----------------------------
-
-st.title("Faculty Course Preference System")
-
-empid = st.text_input("Enter Employee ID")
-
-name = ""
-designation = ""
-
-if empid:
-
-    emp = employees[employees["EmpID"].astype(str) == empid]
-
-    if not emp.empty:
-
-        name = emp.iloc[0]["Name"]
-        designation = emp.iloc[0]["Designation"]
-
-        st.write("Name:", name)
-        st.write("Designation:", designation)
-
-    else:
-        st.error("Employee ID not found")
-
-
-# -----------------------------
-# Basket 1 Preferences
-# -----------------------------
-
-st.subheader("Basket 1 Preferences")
-
-for i in range(7):
-
-    available = [c for c in basket1 if c not in st.session_state.basket1_pref]
-
-    pref = st.selectbox(
-        f"Basket1 Preference {i+1}",
-        [""] + available,
-        key=f"b1_{i}"
-    )
-
-    st.session_state.basket1_pref[i] = pref
-
-
-# -----------------------------
-# Basket 2 Preferences
-# -----------------------------
-
-st.subheader("Basket 2 Preferences")
-
-for i in range(7):
-
-    available = [c for c in basket2 if c not in st.session_state.basket2_pref]
-
-    pref = st.selectbox(
-        f"Basket2 Preference {i+1}",
-        [""] + available,
-        key=f"b2_{i}"
-    )
-
-    st.session_state.basket2_pref[i] = pref
+st.subheader("Basket 2 Course Selection")
+pref2 = st.multiselect("Select Courses ", basket2)
 
 
 # -----------------------------
 # Submit Button
 # -----------------------------
 
-if st.button("Submit Preferences"):
+if st.button("Submit Preference"):
 
-    if empid == "":
-        st.error("Please enter Employee ID")
-
-    elif empid_exists(empid):
-        st.error("You have already submitted preferences")
-
-    elif "" in st.session_state.basket1_pref:
-        st.error("Please select all 7 courses in Basket 1")
-
-    elif "" in st.session_state.basket2_pref:
-        st.error("Please select all 7 courses in Basket 2")
+    if faculty_name == "" or faculty_id == "":
+        st.error("Enter faculty details")
 
     else:
 
-        row = [
-            empid,
-            name,
-            designation,
-            *st.session_state.basket1_pref,
-            *st.session_state.basket2_pref
-        ]
+        data = sheet.get_all_records()
 
-        sheet.append_row(row)
+        existing_ids = [row["Faculty_ID"] for row in data]
 
-        st.success("Preferences submitted successfully!")
+        if faculty_id in existing_ids:
+            st.error("You already submitted preference")
 
-        st.session_state.basket1_pref = [""] * 7
-        st.session_state.basket2_pref = [""] * 7
+        else:
+
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            sheet.append_row([
+                timestamp,
+                faculty_name,
+                faculty_id,
+                ", ".join(pref1),
+                ", ".join(pref2)
+            ])
+
+            st.success("Preference submitted successfully")
