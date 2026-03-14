@@ -2,140 +2,165 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
 
 st.title("Faculty Course Preference System")
 
-# -----------------------
-# Load Employee Data
-# -----------------------
-
-emp_data = pd.read_excel("employees.xlsx", engine="openpyxl")
-
-# -----------------------
-# Load Course Data
-# -----------------------
-
-basket1_df = pd.read_excel("courses.xlsx", sheet_name="Sheet1", engine="openpyxl")
-basket2_df = pd.read_excel("courses.xlsx", sheet_name="Sheet2", engine="openpyxl")
-
-basket1 = basket1_df.iloc[:,0].dropna().tolist()
-basket2 = basket2_df.iloc[:,0].dropna().tolist()
-
-# -----------------------
-# Google Sheet Connection
-# -----------------------
+# -----------------------------
+# GOOGLE SHEETS CONNECTION
+# -----------------------------
 
 scope = [
-"https://www.googleapis.com/auth/spreadsheets",
-"https://www.googleapis.com/auth/drive"
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
 ]
 
 creds = Credentials.from_service_account_info(
-st.secrets["gcp_service_account"],
-scopes=scope
+    st.secrets["gcp_service_account"], scopes=scope
 )
 
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key("1y1a9UvWW-xrIBR7-hEWn70I7NmsSHpX3AEspg-PLXfg").sheet1
+SHEET_ID = "1y1a9UvWW-xrIBR7-hEWn70I7NmsSHpX3AEspg-PLXfg"
 
-# -----------------------
-# Auto Header Creation
-# -----------------------
+sheet = client.open_by_key(SHEET_ID).sheet1
 
-header = [
-"Timestamp",
-"EmpID",
-"Name",
-"Designation",
-"Basket1",
-"Basket2"
+
+# -----------------------------
+# CREATE HEADER AUTOMATICALLY
+# -----------------------------
+
+headers = [
+    "EmpID",
+    "Name",
+    "Designation",
+    "BS1P1","BS1P2","BS1P3","BS1P4","BS1P5","BS1P6","BS1P7",
+    "BS2P1","BS2P2","BS2P3","BS2P4","BS2P5","BS2P6","BS2P7"
 ]
 
-if sheet.row_values(1) != header:
-    sheet.insert_row(header,1)
+first_row = sheet.row_values(1)
 
-# -----------------------
-# Employee ID Input
-# -----------------------
+if first_row != headers:
+    sheet.update('A1:Q1', [headers])
+
+
+# -----------------------------
+# LOAD COURSE FILE
+# -----------------------------
+
+courses = pd.read_excel("courses.xlsx", sheet_name=None)
+
+basket1 = courses["Sheet1"]["Course"].dropna().tolist()
+basket2 = courses["Sheet2"]["Course"].dropna().tolist()
+
+
+# -----------------------------
+# LOAD EMPLOYEE FILE
+# -----------------------------
+
+employees = pd.read_excel("employees.xlsx")
+
+
+# -----------------------------
+# EMPLOYEE ID INPUT
+# -----------------------------
 
 emp_id = st.text_input("Enter Employee ID")
 
 name = ""
 designation = ""
 
-if emp_id != "":
+if emp_id:
 
-    emp = emp_data[emp_data["EmpID"].astype(str) == emp_id]
+    emp_row = employees[employees["EmpID"].astype(str) == emp_id]
 
-    if not emp.empty:
+    if not emp_row.empty:
 
-        name = emp.iloc[0]["Name"]
-        designation = emp.iloc[0]["Designation"]
+        name = emp_row.iloc[0]["Name"]
+        designation = emp_row.iloc[0]["Designation"]
 
         st.success("Employee Found")
 
-        st.write("Name :", name)
-        st.write("Designation :", designation)
+        st.write("Name:", name)
+        st.write("Designation:", designation)
 
     else:
 
         st.error("Invalid Employee ID")
 
-# -----------------------
-# Basket Selection
-# -----------------------
 
-st.subheader("Basket 1 Courses (Select exactly 7)")
+# -----------------------------
+# PREVENT DUPLICATE SUBMISSION
+# -----------------------------
 
-pref1 = st.multiselect(
-"Basket1",
-basket1,
-max_selections=7
-)
+existing_ids = sheet.col_values(1)
 
-st.subheader("Basket 2 Courses (Select exactly 7)")
+if emp_id and emp_id in existing_ids:
+    st.warning("You have already submitted your preferences")
+    st.stop()
 
-pref2 = st.multiselect(
-"Basket2",
-basket2,
-max_selections=7
-)
 
-# -----------------------
-# Submit
-# -----------------------
+# -----------------------------
+# BASKET 1 PREFERENCES
+# -----------------------------
 
-if st.button("Submit Preference"):
+if name != "":
 
-    if emp_id == "" or name == "":
-        st.error("Enter valid Employee ID")
+    st.subheader("Basket 1 Preferences")
 
-    elif len(pref1) != 7 or len(pref2) != 7:
-        st.error("Select exactly 7 courses in each basket")
+    basket1_pref = []
 
-    else:
+    for i in range(1,8):
 
-        data = sheet.get_all_records()
+        course = st.selectbox(
+            f"BS1P{i}",
+            basket1,
+            key=f"b1{i}"
+        )
 
-        existing_ids = [str(row["EmpID"]) for row in data]
+        basket1_pref.append(course)
 
-        if emp_id in existing_ids:
 
-            st.error("You already submitted preference")
+# -----------------------------
+# BASKET 2 PREFERENCES
+# -----------------------------
 
-        else:
+    st.subheader("Basket 2 Preferences")
 
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    basket2_pref = []
 
-            sheet.append_row([
-                timestamp,
-                emp_id,
-                name,
-                designation,
-                ", ".join(pref1),
-                ", ".join(pref2)
-            ])
+    for i in range(1,8):
 
-            st.success("Preference Submitted Successfully")
+        course = st.selectbox(
+            f"BS2P{i}",
+            basket2,
+            key=f"b2{i}"
+        )
+
+        basket2_pref.append(course)
+
+
+# -----------------------------
+# SUBMIT BUTTON
+# -----------------------------
+
+    if st.button("Submit Preference"):
+
+        if len(set(basket1_pref)) != 7:
+            st.error("Basket1 preferences must be unique")
+            st.stop()
+
+        if len(set(basket2_pref)) != 7:
+            st.error("Basket2 preferences must be unique")
+            st.stop()
+
+        row = [
+            emp_id,
+            name,
+            designation,
+            *basket1_pref,
+            *basket2_pref
+        ]
+
+        sheet.append_row(row)
+
+        st.success("Preference Submitted Successfully")
