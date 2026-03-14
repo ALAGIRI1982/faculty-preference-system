@@ -38,7 +38,7 @@ scopes=scope
 
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key("YOUR_SHEET_ID").sheet1
+sheet = client.open_by_key("1y1a9UvWW-xrIBR7-hEWn70I7NmsSHpX3AEspg-PLXfg").sheet1
 
 # -----------------------
 # Auto Header Creation
