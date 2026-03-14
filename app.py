@@ -1,61 +1,72 @@
 import streamlit as st
 import pandas as pd
+import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # -----------------------------
 # Google Sheet Connection
 # -----------------------------
+
 scope = [
 "https://spreadsheets.google.com/feeds",
 "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-"service_account.json", scope)
+creds_dict = json.loads(st.secrets["gcp_service_account"]["json"])
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key("PASTE_YOUR_SHEET_ID_HERE").sheet1
+sheet = client.open_by_key("YOUR_SHEET_ID").sheet1
+
 
 # -----------------------------
-# Function to Check Duplicate EmpID
+# Check Duplicate Submission
 # -----------------------------
+
 def empid_exists(empid):
 
     records = sheet.col_values(1)
 
     if empid in records:
         return True
-    else:
-        return False
+    return False
 
 
 # -----------------------------
 # Load Employee Data
 # -----------------------------
+
 employees = pd.read_excel("employees.xlsx")
+
 
 # -----------------------------
 # Load Course Data
 # -----------------------------
+
 courses = pd.read_excel("courses.xlsx", sheet_name=None)
 
 basket1 = courses["Sheet1"]["Course"].dropna().tolist()
 basket2 = courses["Sheet2"]["Course"].dropna().tolist()
 
+
 # -----------------------------
-# Session State Initialization
+# Session State
 # -----------------------------
+
 if "basket1_pref" not in st.session_state:
     st.session_state.basket1_pref = [""] * 7
 
 if "basket2_pref" not in st.session_state:
     st.session_state.basket2_pref = [""] * 7
 
+
 # -----------------------------
-# Streamlit UI
+# UI
 # -----------------------------
+
 st.title("Faculty Course Preference System")
 
 empid = st.text_input("Enter Employee ID")
@@ -78,9 +89,11 @@ if empid:
     else:
         st.error("Employee ID not found")
 
+
 # -----------------------------
 # Basket 1 Preferences
 # -----------------------------
+
 st.subheader("Basket 1 Preferences")
 
 for i in range(7):
@@ -99,6 +112,7 @@ for i in range(7):
 # -----------------------------
 # Basket 2 Preferences
 # -----------------------------
+
 st.subheader("Basket 2 Preferences")
 
 for i in range(7):
@@ -117,19 +131,20 @@ for i in range(7):
 # -----------------------------
 # Submit Button
 # -----------------------------
+
 if st.button("Submit Preferences"):
 
     if empid == "":
         st.error("Please enter Employee ID")
 
     elif empid_exists(empid):
-        st.error("You have already submitted your preferences")
+        st.error("You have already submitted preferences")
 
     elif "" in st.session_state.basket1_pref:
-        st.error("Select all 7 courses in Basket 1")
+        st.error("Please select all 7 courses in Basket 1")
 
     elif "" in st.session_state.basket2_pref:
-        st.error("Select all 7 courses in Basket 2")
+        st.error("Please select all 7 courses in Basket 2")
 
     else:
 
@@ -145,6 +160,5 @@ if st.button("Submit Preferences"):
 
         st.success("Preferences submitted successfully!")
 
-        # Clear selections after submit
         st.session_state.basket1_pref = [""] * 7
         st.session_state.basket2_pref = [""] * 7
