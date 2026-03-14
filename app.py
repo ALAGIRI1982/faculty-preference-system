@@ -7,14 +7,19 @@ from datetime import datetime
 st.title("Faculty Course Preference System")
 
 # -----------------------------
-# Load Courses from Excel
+# Load Employee Data
 # -----------------------------
 
-courses = pd.read_excel("courses.xlsx")
+emp_data = pd.read_excel("employees.xlsx", engine="openpyxl")
 
-basket1 = courses["Basket1"].dropna().tolist()
-basket2 = courses["Basket2"].dropna().tolist()
+# -----------------------------
+# Load Course Data
+# -----------------------------
 
+course_data = pd.read_excel("courses.xlsx", engine="openpyxl")
+
+basket1 = course_data["Basket1"].dropna().tolist()
+basket2 = course_data["Basket2"].dropna().tolist()
 
 # -----------------------------
 # Google Sheet Connection
@@ -32,55 +37,76 @@ scopes=scope
 
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key("Y1y1a9UvWW-xrIBR7-hEWn70I7NmsSHpX3AEspg-PLXfg").sheet1
-
+sheet = client.open_by_key("1y1a9UvWW-xrIBR7-hEWn70I7NmsSHpX3AEspg-PLXfg").sheet1
 
 # -----------------------------
 # Create Header Automatically
 # -----------------------------
 
-header = ["Timestamp","Faculty_Name","Faculty_ID","Basket1","Basket2"]
+header = [
+"Timestamp",
+"EmpID",
+"Name",
+"Designation",
+"Basket1",
+"Basket2"
+]
 
 if sheet.row_values(1) != header:
     sheet.insert_row(header,1)
 
-
 # -----------------------------
-# Faculty Information
-# -----------------------------
-
-faculty_name = st.text_input("Faculty Name")
-faculty_id = st.text_input("Faculty ID / Email")
-
-
-# -----------------------------
-# Basket Selection
+# Employee ID Input
 # -----------------------------
 
-st.subheader("Basket 1 Course Selection")
-pref1 = st.multiselect("Select Courses", basket1)
+emp_id = st.text_input("Enter Employee ID")
 
-st.subheader("Basket 2 Course Selection")
-pref2 = st.multiselect("Select Courses ", basket2)
+name = ""
+designation = ""
 
+if emp_id != "":
+
+    emp = emp_data[emp_data["EmpID"].astype(str) == emp_id]
+
+    if not emp.empty:
+
+        name = emp.iloc[0]["Name"]
+        designation = emp.iloc[0]["Designation"]
+
+        st.write("Name :", name)
+        st.write("Designation :", designation)
+
+    else:
+
+        st.error("Employee ID not found")
 
 # -----------------------------
-# Submit Button
+# Course Selection
+# -----------------------------
+
+st.subheader("Basket 1 Courses")
+pref1 = st.multiselect("Select Basket 1 Courses", basket1)
+
+st.subheader("Basket 2 Courses")
+pref2 = st.multiselect("Select Basket 2 Courses", basket2)
+
+# -----------------------------
+# Submit
 # -----------------------------
 
 if st.button("Submit Preference"):
 
-    if faculty_name == "" or faculty_id == "":
-        st.error("Enter faculty details")
+    if emp_id == "" or name == "":
+        st.error("Enter valid Employee ID")
 
     else:
 
         data = sheet.get_all_records()
 
-        existing_ids = [row["Faculty_ID"] for row in data]
+        existing_ids = [str(row["EmpID"]) for row in data]
 
-        if faculty_id in existing_ids:
-            st.error("You already submitted preference")
+        if emp_id in existing_ids:
+            st.error("Preference already submitted")
 
         else:
 
@@ -88,10 +114,11 @@ if st.button("Submit Preference"):
 
             sheet.append_row([
                 timestamp,
-                faculty_name,
-                faculty_id,
+                emp_id,
+                name,
+                designation,
                 ", ".join(pref1),
                 ", ".join(pref2)
             ])
 
-            st.success("Preference submitted successfully")
+            st.success("Preference Submitted Successfully")
